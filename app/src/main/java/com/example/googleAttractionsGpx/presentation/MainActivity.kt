@@ -18,9 +18,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -33,12 +37,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.FileProvider
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.example.googleAttractionsGpx.data.repository.SettingsRepositoryImpl
 import com.example.googleAttractionsGpx.domain.repository.SettingsRepository
 import com.example.googleAttractionsGpx.data.repository.GooglePlaceGpxGenerator
@@ -98,38 +104,24 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            GpxGeneratorScreen()
+            val navController = rememberNavController()
+            NavHost(navController = navController, startDestination = "main") {
+                composable("main") { GpxGeneratorScreen(onNavigateToSettings = { navController.navigate("settings") }) }
+                composable("settings") { SettingsScreen(onNavigateBack = { navController.popBackStack() }) }
+            }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GpxGeneratorScreen() {
+fun GpxGeneratorScreen(onNavigateToSettings: () -> Unit = {}) {
     val context = LocalContext.current
     val settingsRepository : SettingsRepository = SettingsRepositoryImpl(context)
     // Coordinates
     var coordinatesText by remember { mutableStateOf(TextFieldValue("")) }
-    // Google API Key
-    var googleApiKeyText by remember { mutableStateOf(TextFieldValue("")) }
-    // TripAdvisor API Key
-    var tripAdvisorApiKeyText by remember { mutableStateOf(TextFieldValue("")) }
-    // iNaturalist Username
-    var iNaturalistUsernameText by remember { mutableStateOf(TextFieldValue("")) }
     // Final GPX result
     var gpxResult by remember { mutableStateOf("") }
-
-    // On first screen launch, read the saved key and fill the field
-    LaunchedEffect(Unit) {
-        val googleKey = settingsRepository.googleApiKey
-        googleApiKeyText = TextFieldValue(googleKey)
-
-        val tripKey = settingsRepository.tripAdvisorApiKey
-        tripAdvisorApiKeyText = TextFieldValue(tripKey)
-
-        val iNatUser = settingsRepository.iNaturalistUsername
-        iNaturalistUsernameText = TextFieldValue(iNatUser)
-    }
 
     // Function to get the current coordinates using FusedLocationProviderClient
     fun fetchCurrentLocation() {
@@ -222,7 +214,8 @@ fun GpxGeneratorScreen() {
 
     // 1) Function to request Google Places API and generate GPX
     fun generateGpx() {
-        val generator = GooglePlaceGpxGenerator(googleApiKeyText.text.trim())
+        val googleKey = settingsRepository.googleApiKey
+        val generator = GooglePlaceGpxGenerator(googleKey)
         generateGpxGeneric(
             generator = generator,
             loadingMessage = "Loading Google Places...",
@@ -230,7 +223,7 @@ fun GpxGeneratorScreen() {
             errorMessage = "Error loading Google Places",
             filePrefix = "Google",
             requiresApiKey = true,
-            apiKey = googleApiKeyText.text.trim()
+            apiKey = googleKey
         )
     }
 
@@ -249,7 +242,8 @@ fun GpxGeneratorScreen() {
 
     // 3) Function to request TripAdvisor API and generate GPX
     fun generateGpxTripAdvisor() {
-        val generator = TripAdvisorGpxGenerator(tripAdvisorApiKeyText.text.trim())
+        val tripKey = settingsRepository.tripAdvisorApiKey
+        val generator = TripAdvisorGpxGenerator(tripKey)
         generateGpxGeneric(
             generator = generator,
             loadingMessage = "Loading TripAdvisor data...",
@@ -257,7 +251,7 @@ fun GpxGeneratorScreen() {
             errorMessage = "Error loading TripAdvisor",
             filePrefix = "TripAdvisor",
             requiresApiKey = true,
-            apiKey = tripAdvisorApiKeyText.text.trim()
+            apiKey = tripKey
         )
     }
 
@@ -289,8 +283,8 @@ fun GpxGeneratorScreen() {
 
     // 6) Function to request Combined attractions and generate GPX
     fun generateCombinedGpx() {
-        val googleKey = googleApiKeyText.text.trim()
-        val tripKey = tripAdvisorApiKeyText.text.trim()
+        val googleKey = settingsRepository.googleApiKey
+        val tripKey = settingsRepository.tripAdvisorApiKey
         val sourceCounts = mutableMapOf<String, Int>()
         val sourceErrors = mutableMapOf<String, String>()
         val generator = AllAttractionsGenerator(googleKey, tripKey) { name, count, error ->
@@ -319,7 +313,7 @@ fun GpxGeneratorScreen() {
     }
     // 7) Function to generate iNaturalist unobserved species GPX
     fun generateINaturalistGpx() {
-        val iNatUsername = iNaturalistUsernameText.text.trim()
+        val iNatUsername = settingsRepository.iNaturalistUsername
         if (iNatUsername.isEmpty()) {
             gpxResult = "Please provide iNaturalist username."
             return
@@ -336,7 +330,17 @@ fun GpxGeneratorScreen() {
     }
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("GPX Generator") })
+            TopAppBar(
+                title = { Text("GPX Generator") },
+                actions = {
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = "Settings"
+                        )
+                    }
+                }
+            )
         }
     ) {
         Column(
@@ -359,41 +363,6 @@ fun GpxGeneratorScreen() {
             ) {
                 Text("Current coordinates")
             }
-
-            // API Key field with saving to SharedPreferences
-            OutlinedTextField(
-                value = googleApiKeyText,
-                onValueChange = { newValue ->
-                    googleApiKeyText = newValue
-                    settingsRepository.googleApiKey = newValue.text
-                },
-                label = { Text("Places API Key") },
-                modifier = Modifier.fillMaxWidth(),
-                visualTransformation = PasswordVisualTransformation(),
-            )
-
-            // TripAdvisor API Key
-            OutlinedTextField(
-                value = tripAdvisorApiKeyText,
-                onValueChange = {
-                    tripAdvisorApiKeyText = it
-                    settingsRepository.tripAdvisorApiKey = it.text
-                },
-                label = { Text("TripAdvisor API Key") },
-                modifier = Modifier.fillMaxWidth(),
-                visualTransformation = PasswordVisualTransformation(),
-            )
-
-            // iNaturalist Username
-            OutlinedTextField(
-                value = iNaturalistUsernameText,
-                onValueChange = {
-                    iNaturalistUsernameText = it
-                    settingsRepository.iNaturalistUsername = it.text
-                },
-                label = { Text("iNaturalist Username") },
-                modifier = Modifier.fillMaxWidth(),
-            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
