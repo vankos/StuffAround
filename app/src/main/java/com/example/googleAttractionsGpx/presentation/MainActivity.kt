@@ -47,6 +47,7 @@ import com.example.googleAttractionsGpx.data.repository.TripAdvisorGpxGenerator
 import com.example.googleAttractionsGpx.data.repository.WikipediaArticlesGpxGenerator
 import com.example.googleAttractionsGpx.data.repository.WikidataAttractionsGpxGenerator
 import com.example.googleAttractionsGpx.data.repository.AllAttractionsGenerator
+import com.example.googleAttractionsGpx.data.repository.INaturalistGpxGenerator
 import com.example.googleAttractionsGpx.data.repository.NominatimService
 import com.example.googleAttractionsGpx.domain.models.Coordinates
 import com.example.googleAttractionsGpx.domain.repository.IGpxGenerator
@@ -113,6 +114,8 @@ fun GpxGeneratorScreen() {
     var googleApiKeyText by remember { mutableStateOf(TextFieldValue("")) }
     // TripAdvisor API Key
     var tripAdvisorApiKeyText by remember { mutableStateOf(TextFieldValue("")) }
+    // iNaturalist Username
+    var iNaturalistUsernameText by remember { mutableStateOf(TextFieldValue("")) }
     // Final GPX result
     var gpxResult by remember { mutableStateOf("") }
 
@@ -123,6 +126,9 @@ fun GpxGeneratorScreen() {
 
         val tripKey = settingsRepository.tripAdvisorApiKey
         tripAdvisorApiKeyText = TextFieldValue(tripKey)
+
+        val iNatUser = settingsRepository.iNaturalistUsername
+        iNaturalistUsernameText = TextFieldValue(iNatUser)
     }
 
     // Function to get the current coordinates using FusedLocationProviderClient
@@ -311,7 +317,23 @@ fun GpxGeneratorScreen() {
             }
         )
     }
-
+    // 7) Function to generate iNaturalist unobserved species GPX
+    fun generateINaturalistGpx() {
+        val iNatUsername = iNaturalistUsernameText.text.trim()
+        if (iNatUsername.isEmpty()) {
+            gpxResult = "Please provide iNaturalist username."
+            return
+        }
+        val generator = INaturalistGpxGenerator(iNatUsername)
+        generateGpxGeneric(
+            generator = generator,
+            loadingMessage = "Loading iNaturalist unobserved species...",
+            successMessage = "iNaturalist GPX created.",
+            errorMessage = "Error loading iNaturalist data",
+            filePrefix = "iNaturalist",
+            requiresApiKey = false
+        )
+    }
     Scaffold(
         topBar = {
             TopAppBar(title = { Text("GPX Generator") })
@@ -362,6 +384,17 @@ fun GpxGeneratorScreen() {
                 visualTransformation = PasswordVisualTransformation(),
             )
 
+            // iNaturalist Username
+            OutlinedTextField(
+                value = iNaturalistUsernameText,
+                onValueChange = {
+                    iNaturalistUsernameText = it
+                    settingsRepository.iNaturalistUsername = it.text
+                },
+                label = { Text("iNaturalist Username") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
             Spacer(modifier = Modifier.height(8.dp))
 
             // Group main GPX generators
@@ -404,6 +437,14 @@ fun GpxGeneratorScreen() {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Generate GPX (All Attractions)")
+                }
+
+                // Button for iNaturalist
+                Button(
+                    onClick = { generateINaturalistGpx() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Generate GPX (iNaturalist)")
                 }
             }
 

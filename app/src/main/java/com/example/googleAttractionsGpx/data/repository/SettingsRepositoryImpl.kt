@@ -25,4 +25,10 @@ class SettingsRepositoryImpl
             sharedPrefs.edit() { putString("TRIP_ADVISOR_API_KEY", value) }
         }
 
+    override var iNaturalistUsername: String
+        get() = sharedPrefs.getString("INATURALIST_USERNAME", "") ?: ""
+        set(value) {
+            sharedPrefs.edit() { putString("INATURALIST_USERNAME", value) }
+        }
+
 }
