@@ -8,6 +8,7 @@ import java.net.URL
 import java.net.URLEncoder
 import java.time.LocalDate
 import java.time.MonthDay
+import java.util.Locale
 
 class INaturalistGpxGenerator(private val username: String) : GpxGeneratorBase() {
 
@@ -100,6 +101,7 @@ class INaturalistGpxGenerator(private val username: String) : GpxGeneratorBase()
         val perPage = 200
         val monthParam = months.sorted().joinToString(",")
         val fields = "(id:!t,uuid:!t,taxon:(id:!t,preferred_common_name:!t,name:!t),location:!t,observed_on:!t)"
+        val locale = Locale.getDefault().language
 
         while (true) {
             val url = "https://api.inaturalist.org/v2/observations" +
@@ -110,6 +112,7 @@ class INaturalistGpxGenerator(private val username: String) : GpxGeneratorBase()
                     "&month=$monthParam" +
                     "&per_page=$perPage" +
                     "&page=$page" +
+                    "&locale=$locale" +
                     "&fields=$fields"
 
             val json = fetchJson(url)
