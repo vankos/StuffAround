@@ -127,8 +127,26 @@ fun GpxGeneratorScreen(onNavigateToSettings: () -> Unit = {}) {
     var showMapPicker by remember { mutableStateOf(false) }
     var isGenerating by remember { mutableStateOf(false) }
 
+    val availableSources: Set<String> = remember(
+        settingsRepository.googleApiKey,
+        settingsRepository.tripAdvisorApiKey,
+        settingsRepository.iNaturalistUsername
+    ) {
+        buildSet {
+            addAll(listOf("osm", "wikidata", "wiki"))
+            if (settingsRepository.googleApiKey.isNotBlank()) add("google")
+            if (settingsRepository.tripAdvisorApiKey.isNotBlank()) add("trip")
+            if (settingsRepository.iNaturalistUsername.isNotBlank()) add("inat")
+        }
+    }
+
     LaunchedEffect(selectedSources) {
         settingsRepository.selectedSources = selectedSources
+    }
+
+    LaunchedEffect(availableSources) {
+        val filtered = selectedSources.intersect(availableSources)
+        if (filtered != selectedSources) selectedSources = filtered
     }
 
     // ── helpers ──
@@ -234,9 +252,11 @@ fun GpxGeneratorScreen(onNavigateToSettings: () -> Unit = {}) {
                 )
                 SourcesSection(
                     selected = selectedSources,
+                    available = availableSources,
                     onToggle = { id ->
-                        selectedSources = if (selectedSources.contains(id))
-                            selectedSources - id else selectedSources + id
+                        if (availableSources.contains(id))
+                            selectedSources = if (selectedSources.contains(id))
+                                selectedSources - id else selectedSources + id
                     }
                 )
                 if (statusText.isNotEmpty()) {
@@ -354,7 +374,7 @@ private fun LocationCard(
 // ── Sources section ───────────────────────────────────────────────────────────
 
 @Composable
-private fun SourcesSection(selected: Set<String>, onToggle: (String) -> Unit) {
+private fun SourcesSection(selected: Set<String>, available: Set<String>, onToggle: (String) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 10.dp),
@@ -370,20 +390,29 @@ private fun SourcesSection(selected: Set<String>, onToggle: (String) -> Unit) {
         }
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             ALL_SOURCES.forEach { src ->
-                SourceRow(src, selected.contains(src.id)) { onToggle(src.id) }
+                SourceRow(src, selected.contains(src.id), available.contains(src.id)) { onToggle(src.id) }
             }
         }
     }
 }
 
 @Composable
-private fun SourceRow(source: SourceDef, selected: Boolean, onToggle: () -> Unit) {
-    val bg = if (selected) MaterialTheme.colorScheme.secondaryContainer
-             else MaterialTheme.colorScheme.surfaceContainerLow
-    val fg = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
-             else MaterialTheme.colorScheme.onSurface
+private fun SourceRow(source: SourceDef, selected: Boolean, enabled: Boolean = true, onToggle: () -> Unit) {
+    val bg = when {
+        !enabled  -> MaterialTheme.colorScheme.surfaceContainerLowest
+        selected  -> MaterialTheme.colorScheme.secondaryContainer
+        else      -> MaterialTheme.colorScheme.surfaceContainerLow
+    }
+    val fg = when {
+        !enabled  -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        selected  -> MaterialTheme.colorScheme.onSecondaryContainer
+        else      -> MaterialTheme.colorScheme.onSurface
+    }
 
-    Surface(onClick = onToggle, shape = RoundedCornerShape(16.dp), color = bg,
+    Surface(
+        onClick = { if (enabled) onToggle() },
+        shape = RoundedCornerShape(16.dp),
+        color = bg,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -411,7 +440,12 @@ private fun SourceRow(source: SourceDef, selected: Boolean, onToggle: () -> Unit
                     style = MaterialTheme.typography.bodyMedium,
                     color = fg.copy(alpha = if (selected) 0.85f else 1f))
             }
-            if (selected) {
+            if (!enabled) {
+                Surface(shape = CircleShape, color = Color.Transparent,
+                    border = ButtonDefaults.outlinedButtonBorder(false),
+                    modifier = Modifier.size(24.dp)
+                ) {}
+            } else if (selected) {
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier.size(24.dp).background(MaterialTheme.colorScheme.primary, CircleShape)
