@@ -31,4 +31,10 @@ class SettingsRepositoryImpl
             sharedPrefs.edit() { putString("INATURALIST_USERNAME", value) }
         }
 
+    override var selectedSources: Set<String>
+        get() = sharedPrefs.getStringSet("SELECTED_SOURCES", setOf("google", "osm")) ?: setOf("google", "osm")
+        set(value) {
+            sharedPrefs.edit() { putStringSet("SELECTED_SOURCES", value) }
+        }
+
 }

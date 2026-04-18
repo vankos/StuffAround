@@ -4,4 +4,5 @@ interface SettingsRepository {
     var googleApiKey: String
     var tripAdvisorApiKey: String
     var iNaturalistUsername: String
+    var selectedSources: Set<String>
 }
