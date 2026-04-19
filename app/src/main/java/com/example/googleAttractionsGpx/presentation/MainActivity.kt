@@ -257,7 +257,9 @@ fun GpxGeneratorScreen(onNavigateToSettings: () -> Unit = {}) {
                         if (availableSources.contains(id))
                             selectedSources = if (selectedSources.contains(id))
                                 selectedSources - id else selectedSources + id
-                    }
+                    },
+                    onSelectAll = { selectedSources = availableSources },
+                    onDeselectAll = { selectedSources = emptySet() }
                 )
                 if (statusText.isNotEmpty()) {
                     Text(
@@ -374,19 +376,30 @@ private fun LocationCard(
 // ── Sources section ───────────────────────────────────────────────────────────
 
 @Composable
-private fun SourcesSection(selected: Set<String>, available: Set<String>, onToggle: (String) -> Unit) {
+private fun SourcesSection(
+    selected: Set<String>,
+    available: Set<String>,
+    onToggle: (String) -> Unit,
+    onSelectAll: () -> Unit = {},
+    onDeselectAll: () -> Unit = {},
+) {
+    val allSelected = selected.containsAll(available) && available.isNotEmpty()
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.Bottom,
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text("Sources", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "${selected.size} selected",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            TextButton(
+                onClick = if (allSelected) onDeselectAll else onSelectAll,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    if (allSelected) "Deselect all" else "Select all",
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
         }
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             ALL_SOURCES.forEach { src ->
