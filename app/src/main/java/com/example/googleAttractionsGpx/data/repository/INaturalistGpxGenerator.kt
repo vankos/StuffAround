@@ -19,7 +19,7 @@ class INaturalistGpxGenerator(private val username: String) : GpxGeneratorBase()
         val latitude: Double,
         val longitude: Double,
         val observedOn: String,
-        val uuid: String,
+        val id: Long,
         val dayOfYear: Int
     )
 
@@ -57,7 +57,7 @@ class INaturalistGpxGenerator(private val username: String) : GpxGeneratorBase()
             PointData(
                 coordinates = Coordinates(obs.latitude, obs.longitude),
                 name = speciesName,
-                description = "Observed: ${obs.observedOn}\nhttps://www.inaturalist.org/observations/${obs.uuid}"
+                description = "Observed: ${obs.observedOn}\nhttps://www.inaturalist.org/observations/${obs.id}"
             )
         }
     }
@@ -100,7 +100,7 @@ class INaturalistGpxGenerator(private val username: String) : GpxGeneratorBase()
         var page = 1
         val perPage = 200
         val monthParam = months.sorted().joinToString(",")
-        val fields = "(id:!t,uuid:!t,taxon:(id:!t,preferred_common_name:!t,name:!t),location:!t,observed_on:!t)"
+        val fields = "(id:!t,taxon:(id:!t,preferred_common_name:!t,name:!t),location:!t,observed_on:!t)"
         val locale = Locale.getDefault().language
 
         while (true) {
@@ -145,7 +145,7 @@ class INaturalistGpxGenerator(private val username: String) : GpxGeneratorBase()
                         latitude = obsLat,
                         longitude = obsLng,
                         observedOn = observedOn,
-                        uuid = obs.optString("uuid", ""),
+                        id = obs.optLong("id", 0L),
                         dayOfYear = doy
                     )
                 )
