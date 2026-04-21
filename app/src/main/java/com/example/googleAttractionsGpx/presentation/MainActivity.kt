@@ -64,6 +64,7 @@ val ALL_SOURCES = listOf(
     SourceDef("wikidata", "Wikidata",       "Encyclopedic attractions"),
     SourceDef("inat",     "iNaturalist",    "Nature observations"),
     SourceDef("wiki",     "Wikipedia",      "Articles about places"),
+    SourceDef("nophoto",  "Need a photo",   "Wikidata objects without photos — photograph them!"),
 )
 
 class MainActivity : ComponentActivity() {
@@ -104,7 +105,13 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     composable("settings") {
-                        SettingsScreen(onNavigateBack = { navController.popBackStack() })
+                        SettingsScreen(
+                            onNavigateBack = { navController.popBackStack() },
+                            onNavigateToNeedPhotoExclusions = { navController.navigate("settings/need-photo-exclusions") }
+                        )
+                    }
+                    composable("settings/need-photo-exclusions") {
+                        NeedPhotoExclusionsScreen(onNavigateBack = { navController.popBackStack() })
                     }
                 }
             }
@@ -133,7 +140,7 @@ fun GpxGeneratorScreen(onNavigateToSettings: () -> Unit = {}) {
         settingsRepository.iNaturalistUsername
     ) {
         buildSet {
-            addAll(listOf("osm", "wikidata", "wiki"))
+            addAll(listOf("osm", "wikidata", "wiki", "nophoto"))
             if (settingsRepository.googleApiKey.isNotBlank()) add("google")
             if (settingsRepository.tripAdvisorApiKey.isNotBlank()) add("trip")
             if (settingsRepository.iNaturalistUsername.isNotBlank()) add("inat")
@@ -169,6 +176,7 @@ fun GpxGeneratorScreen(onNavigateToSettings: () -> Unit = {}) {
         "wikidata" -> WikidataAttractionsGpxGenerator()
         "inat"     -> INaturalistGpxGenerator(settings.iNaturalistUsername)
         "wiki"     -> WikipediaArticlesGpxGenerator()
+        "nophoto"  -> NeedPhotoWikidataGpxGenerator(settings.needPhotoExclusions)
         else       -> null
     }
 
@@ -484,6 +492,7 @@ private fun sourceEmoji(id: String) = when (id) {
     "wikidata" -> "\u2B50"
     "inat"     -> "\uD83C\uDF3F"
     "wiki"     -> "\uD83D\uDCD6"
+    "nophoto"  -> "\uD83D\uDCF7"
     else       -> "\uD83D\uDCCD"
 }
 
