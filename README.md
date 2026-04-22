@@ -53,7 +53,8 @@ Default exclusions for **Need a photo**:
 
 1. Enter coordinates in the `lat,lng` field, tap **Current**, or pick a point on the map.
 2. Select one or more data sources.
-3. After generation the app will prompt you to open the file in an external app (e.g. OsmAnd, Locus Map).
+3. Optionally tap the **color dot** next to any source to change its color in the palette — the chosen color is saved and applied to all waypoints from that source in the output file.
+4. After generation the app will prompt you to open the file in an external app (e.g. OsmAnd, Locus Map).
 
 Generated files are saved to `Android/data/com.example.googleAttractionsGpx/files/`.
 
