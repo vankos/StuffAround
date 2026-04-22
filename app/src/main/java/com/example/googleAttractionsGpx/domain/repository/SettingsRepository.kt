@@ -6,4 +6,5 @@ interface SettingsRepository {
     var iNaturalistUsername: String
     var needPhotoExclusions: List<String>
     var selectedSources: Set<String>
+    var sourceColors: Map<String, String>
 }

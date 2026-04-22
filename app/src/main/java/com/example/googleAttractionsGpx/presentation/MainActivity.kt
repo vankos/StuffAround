@@ -11,7 +11,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,11 +27,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.core.app.ActivityCompat
 import androidx.core.content.FileProvider
 import androidx.navigation.compose.NavHost
@@ -55,6 +64,12 @@ data class SourceDef(
     val label: String,
     val desc: String,
     val requiresApiKey: Boolean = false,
+)
+
+val SOURCE_COLOR_PRESETS = listOf(
+    "#E53935", "#E91E63", "#9C27B0", "#3F51B5",
+    "#2196F3", "#00BCD4", "#4CAF50", "#FF9800",
+    "#795548", "#607D8B",
 )
 
 val ALL_SOURCES = listOf(
@@ -130,6 +145,7 @@ fun GpxGeneratorScreen(onNavigateToSettings: () -> Unit = {}) {
 
     var coordinatesText by remember { mutableStateOf("") }
     var selectedSources by remember { mutableStateOf(settingsRepository.selectedSources) }
+    var sourceColors by remember { mutableStateOf(settingsRepository.sourceColors) }
     var statusText by remember { mutableStateOf("") }
     var showMapPicker by remember { mutableStateOf(false) }
     var isGenerating by remember { mutableStateOf(false) }
@@ -149,6 +165,10 @@ fun GpxGeneratorScreen(onNavigateToSettings: () -> Unit = {}) {
 
     LaunchedEffect(selectedSources) {
         settingsRepository.selectedSources = selectedSources
+    }
+
+    LaunchedEffect(sourceColors) {
+        settingsRepository.sourceColors = sourceColors
     }
 
     LaunchedEffect(availableSources) {
@@ -204,7 +224,10 @@ fun GpxGeneratorScreen(onNavigateToSettings: () -> Unit = {}) {
                     }
                 }
                 val results = deferreds.map { it.await() }
-                results.forEach { (_, pts) -> allPoints.addAll(pts) }
+                results.forEach { (id, pts) ->
+                    val color = sourceColors[id]
+                    allPoints.addAll(pts.map { it.copy(color = color) })
+                }
 
                 val gpxString = buildGpxContent(allPoints)
                 val fileName = withContext(Dispatchers.IO) { getFileName(coords, sources.joinToString("-")) }
@@ -261,13 +284,15 @@ fun GpxGeneratorScreen(onNavigateToSettings: () -> Unit = {}) {
                 SourcesSection(
                     selected = selectedSources,
                     available = availableSources,
+                    colors = sourceColors,
                     onToggle = { id ->
                         if (availableSources.contains(id))
                             selectedSources = if (selectedSources.contains(id))
                                 selectedSources - id else selectedSources + id
                     },
                     onSelectAll = { selectedSources = availableSources },
-                    onDeselectAll = { selectedSources = emptySet() }
+                    onDeselectAll = { selectedSources = emptySet() },
+                    onColorChange = { id, color -> sourceColors = sourceColors + (id to color) }
                 )
                 if (statusText.isNotEmpty()) {
                     Text(
@@ -387,9 +412,11 @@ private fun LocationCard(
 private fun SourcesSection(
     selected: Set<String>,
     available: Set<String>,
+    colors: Map<String, String>,
     onToggle: (String) -> Unit,
     onSelectAll: () -> Unit = {},
     onDeselectAll: () -> Unit = {},
+    onColorChange: (String, String) -> Unit = { _, _ -> },
 ) {
     val allSelected = selected.containsAll(available) && available.isNotEmpty()
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -411,14 +438,76 @@ private fun SourcesSection(
         }
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             ALL_SOURCES.forEach { src ->
-                SourceRow(src, selected.contains(src.id), available.contains(src.id)) { onToggle(src.id) }
+                SourceRow(
+                    source = src,
+                    selected = selected.contains(src.id),
+                    enabled = available.contains(src.id),
+                    color = colors[src.id] ?: SettingsRepositoryImpl.DEFAULT_SOURCE_COLORS[src.id] ?: "#2196F3",
+                    onToggle = { onToggle(src.id) },
+                    onColorChange = { color -> onColorChange(src.id, color) },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun SourceRow(source: SourceDef, selected: Boolean, enabled: Boolean = true, onToggle: () -> Unit) {
+private fun ColorDot(color: String, modifier: Modifier = Modifier) {
+    val parsed = runCatching { Color(android.graphics.Color.parseColor(color)) }.getOrElse { Color(0xFF2196F3) }
+    Box(
+        modifier = modifier
+            .size(28.dp)
+            .background(parsed, CircleShape)
+            .border(2.5.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ColorPicker(
+    current: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shadowElevation = 8.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        FlowRow(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SOURCE_COLOR_PRESETS.forEach { c ->
+                val parsed = runCatching { Color(android.graphics.Color.parseColor(c)) }.getOrElse { Color.Gray }
+                val isActive = c.equals(current, ignoreCase = true)
+                Box(
+                    modifier = Modifier
+                        .shadow(4.dp, CircleShape)
+                        .size(40.dp)
+                        .background(parsed, CircleShape)
+                        .then(
+                            if (isActive) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                            else Modifier
+                        )
+                        .clickable { onSelect(c); onDismiss() }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourceRow(
+    source: SourceDef,
+    selected: Boolean,
+    enabled: Boolean = true,
+    color: String,
+    onToggle: () -> Unit,
+    onColorChange: (String) -> Unit,
+) {
     val bg = when {
         !enabled  -> MaterialTheme.colorScheme.surfaceContainerLowest
         selected  -> MaterialTheme.colorScheme.secondaryContainer
@@ -430,56 +519,90 @@ private fun SourceRow(source: SourceDef, selected: Boolean, enabled: Boolean = t
         else      -> MaterialTheme.colorScheme.onSurface
     }
 
-    Surface(
-        onClick = { if (enabled) onToggle() },
-        shape = RoundedCornerShape(16.dp),
-        color = bg,
-        modifier = Modifier.fillMaxWidth()
+    var showColorPicker by remember { mutableStateOf(false) }
+    var cardHeightPx by remember { mutableStateOf(0) }
+    var cardWidthPx by remember { mutableStateOf(0) }
+    val density = LocalDensity.current
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onGloballyPositioned {
+                cardHeightPx = it.size.height
+                cardWidthPx = it.size.width
+            }
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        Surface(
+            onClick = { if (enabled) onToggle() },
+            shape = RoundedCornerShape(16.dp),
+            color = bg,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(
-                        if (selected) MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f)
-                        else MaterialTheme.colorScheme.surfaceContainerHigh,
-                        RoundedCornerShape(12.dp)
-                    )
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(sourceEmoji(source.id), fontSize = 20.sp)
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(source.label,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                    color = fg)
-                Text(source.desc,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = fg.copy(alpha = if (selected) 0.85f else 1f))
-            }
-            if (!enabled) {
-                Surface(shape = CircleShape, color = Color.Transparent,
-                    border = ButtonDefaults.outlinedButtonBorder(false),
-                    modifier = Modifier.size(24.dp)
-                ) {}
-            } else if (selected) {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(24.dp).background(MaterialTheme.colorScheme.primary, CircleShape)
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(
+                            if (selected) MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f)
+                            else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            RoundedCornerShape(12.dp)
+                        )
                 ) {
-                    Icon(Icons.Filled.Check, null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(16.dp))
+                    Text(sourceEmoji(source.id), fontSize = 20.sp)
                 }
-            } else {
-                Surface(shape = CircleShape, color = Color.Transparent,
-                    border = ButtonDefaults.outlinedButtonBorder(true),
-                    modifier = Modifier.size(24.dp)
-                ) {}
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(source.label,
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                        color = fg)
+                    Text(source.desc,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = fg.copy(alpha = if (selected) 0.85f else 1f))
+                }
+                ColorDot(
+                    color = color,
+                    modifier = Modifier.clickable { showColorPicker = !showColorPicker }
+                )
+                if (!enabled) {
+                    Surface(shape = CircleShape, color = Color.Transparent,
+                        border = ButtonDefaults.outlinedButtonBorder(false),
+                        modifier = Modifier.size(24.dp)
+                    ) {}
+                } else if (selected) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(24.dp).background(MaterialTheme.colorScheme.primary, CircleShape)
+                    ) {
+                        Icon(Icons.Filled.Check, null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(16.dp))
+                    }
+                } else {
+                    Surface(shape = CircleShape, color = Color.Transparent,
+                        border = ButtonDefaults.outlinedButtonBorder(true),
+                        modifier = Modifier.size(24.dp)
+                    ) {}
+                }
+            }
+        }
+        if (showColorPicker) {
+            Popup(
+                alignment = Alignment.TopStart,
+                offset = IntOffset(0, cardHeightPx + with(density) { 4.dp.roundToPx() }),
+                onDismissRequest = { showColorPicker = false },
+                properties = PopupProperties(focusable = true),
+            ) {
+                Box(modifier = Modifier.width(with(density) { cardWidthPx.toDp() })) {
+                    ColorPicker(
+                        current = color,
+                        onSelect = { onColorChange(it); showColorPicker = false },
+                        onDismiss = { showColorPicker = false },
+                    )
+                }
             }
         }
     }

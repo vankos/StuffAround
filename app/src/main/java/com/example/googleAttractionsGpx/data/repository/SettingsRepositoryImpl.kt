@@ -15,6 +15,17 @@ class SettingsRepositoryImpl
         private const val INATURALIST_USERNAME = "INATURALIST_USERNAME"
         private const val NEED_PHOTO_EXCLUSIONS = "NEED_PHOTO_EXCLUSIONS"
         private const val SELECTED_SOURCES = "SELECTED_SOURCES"
+        private const val SOURCE_COLOR_PREFIX = "SOURCE_COLOR_"
+
+        val DEFAULT_SOURCE_COLORS = mapOf(
+            "google"   to "#4CAF50",
+            "osm"      to "#2196F3",
+            "trip"     to "#E53935",
+            "wikidata" to "#9C27B0",
+            "inat"     to "#FF9800",
+            "wiki"     to "#607D8B",
+            "nophoto"  to "#00BCD4",
+        )
     }
 
     val sharedPrefs : SharedPreferences
@@ -50,6 +61,16 @@ class SettingsRepositoryImpl
         get() = sharedPrefs.getStringSet(SELECTED_SOURCES, setOf("google", "osm")) ?: setOf("google", "osm")
         set(value) {
             sharedPrefs.edit() { putStringSet(SELECTED_SOURCES, value) }
+        }
+
+    override var sourceColors: Map<String, String>
+        get() = DEFAULT_SOURCE_COLORS.mapValues { (id, default) ->
+            sharedPrefs.getString("$SOURCE_COLOR_PREFIX$id", default) ?: default
+        }
+        set(value) {
+            sharedPrefs.edit() {
+                value.forEach { (id, color) -> putString("$SOURCE_COLOR_PREFIX$id", color) }
+            }
         }
 
 }
