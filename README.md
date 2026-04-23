@@ -1,4 +1,4 @@
-# GPX Generator
+# Stuff around
 
 An Android app that generates GPX files with points of interest around given coordinates. Supports multiple data sources.
 

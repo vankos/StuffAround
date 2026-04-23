@@ -259,7 +259,7 @@ fun GpxGeneratorScreen(onNavigateToSettings: () -> Unit = {}) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("GPX Generator") },
+                title = { Text("Stuff around") },
                 actions = {
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = "Settings")

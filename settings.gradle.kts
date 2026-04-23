@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Google atractions gpx"
+rootProject.name = "Stuff around"
 include(":app")
  
