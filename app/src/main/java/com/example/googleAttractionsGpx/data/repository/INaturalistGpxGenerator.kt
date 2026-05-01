@@ -2,15 +2,18 @@ package com.example.googleAttractionsGpx.data.repository
 
 import com.example.googleAttractionsGpx.domain.models.Coordinates
 import com.example.googleAttractionsGpx.domain.models.PointData
+import android.content.Context
+import com.example.googleAttractionsGpx.R
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import java.time.LocalDate
 import java.time.MonthDay
+import java.time.OffsetDateTime
 import java.util.Locale
 
-class INaturalistGpxGenerator(private val username: String) : GpxGeneratorBase() {
+class INaturalistGpxGenerator(private val username: String, private val context: Context) : GpxGeneratorBase() {
 
     private data class Observation(
         val taxonId: Int,
@@ -20,7 +23,8 @@ class INaturalistGpxGenerator(private val username: String) : GpxGeneratorBase()
         val longitude: Double,
         val observedOn: String,
         val id: Long,
-        val dayOfYear: Int
+        val dayOfYear: Int,
+        val timeObservedAt: String?
     )
 
     override fun getData(coordinates: Coordinates, radiusMeters: Int): List<PointData> {
@@ -52,14 +56,50 @@ class INaturalistGpxGenerator(private val username: String) : GpxGeneratorBase()
         val speciesName = topObservations.first().let {
             it.commonName.ifEmpty { it.scientificName }
         }
+        val timeDesc = buildTimeDescription(topObservations)
 
         return topObservations.map { obs ->
             PointData(
                 coordinates = Coordinates(obs.latitude, obs.longitude),
                 name = speciesName,
-                description = "Observed: ${obs.observedOn}\nhttps://www.inaturalist.org/observations/${obs.id}"
+                description = "Observed: ${obs.observedOn}\nhttps://www.inaturalist.org/observations/${obs.id}\n${context.getString(R.string.inat_time_label)} $timeDesc"
             )
         }
+    }
+
+    private fun getObservationHour(timeObservedAt: String?): Int? {
+        if (timeObservedAt.isNullOrBlank()) return null
+        return try {
+            OffsetDateTime.parse(timeObservedAt).hour
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun getTimeIntervalName(hour: Int): String = when (hour) {
+        in 4..7   -> context.getString(R.string.inat_time_early_morning)
+        in 8..10  -> context.getString(R.string.inat_time_morning)
+        in 11..13 -> context.getString(R.string.inat_time_midday)
+        in 14..16 -> context.getString(R.string.inat_time_afternoon)
+        in 17..19 -> context.getString(R.string.inat_time_evening)
+        in 20..23 -> context.getString(R.string.inat_time_late_evening)
+        else      -> context.getString(R.string.inat_time_night) // 0..3
+    }
+
+    private fun buildTimeDescription(observations: List<Observation>): String {
+        val counts = mutableMapOf<String, Int>()
+        for (obs in observations) {
+            val hour = getObservationHour(obs.timeObservedAt) ?: continue
+            val interval = getTimeIntervalName(hour)
+            counts[interval] = (counts[interval] ?: 0) + 1
+        }
+        val total = counts.values.sum()
+        if (total == 0) return context.getString(R.string.inat_time_all_day)
+        val significant = counts.filter { it.value.toDouble() / total > 0.20 }
+        if (significant.isEmpty()) return context.getString(R.string.inat_time_all_day)
+        return significant.entries
+            .sortedByDescending { it.value }
+            .joinToString(", ") { "${it.key} (${it.value})" }
     }
 
     private fun resolveUserId(login: String): Int {
@@ -100,7 +140,7 @@ class INaturalistGpxGenerator(private val username: String) : GpxGeneratorBase()
         var page = 1
         val perPage = 200
         val monthParam = months.sorted().joinToString(",")
-        val fields = "(id:!t,taxon:(id:!t,preferred_common_name:!t,name:!t),location:!t,observed_on:!t)"
+        val fields = "(id:!t,taxon:(id:!t,preferred_common_name:!t,name:!t),location:!t,observed_on:!t,time_observed_at:!t)"
         val locale = Locale.getDefault().language
 
         while (true) {
@@ -137,6 +177,8 @@ class INaturalistGpxGenerator(private val username: String) : GpxGeneratorBase()
                     continue
                 }
 
+                val timeStr = obs.optString("time_observed_at", "").ifBlank { null }
+
                 allObs.add(
                     Observation(
                         taxonId = taxon.getInt("id"),
@@ -146,7 +188,8 @@ class INaturalistGpxGenerator(private val username: String) : GpxGeneratorBase()
                         longitude = obsLng,
                         observedOn = observedOn,
                         id = obs.optLong("id", 0L),
-                        dayOfYear = doy
+                        dayOfYear = doy,
+                        timeObservedAt = timeStr
                     )
                 )
             }

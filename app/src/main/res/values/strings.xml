@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">Stuff around</string>
+    <string name="inat_time_label">Observation time:</string>
+    <string name="inat_time_all_day">all day</string>
+    <string name="inat_time_early_morning">Early morning</string>
+    <string name="inat_time_morning">Morning</string>
+    <string name="inat_time_midday">Midday</string>
+    <string name="inat_time_afternoon">Afternoon</string>
+    <string name="inat_time_evening">Evening</string>
+    <string name="inat_time_late_evening">Late evening</string>
+    <string name="inat_time_night">Night</string>
 </resources>

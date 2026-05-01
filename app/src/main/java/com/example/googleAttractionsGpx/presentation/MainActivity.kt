@@ -194,7 +194,7 @@ fun GpxGeneratorScreen(onNavigateToSettings: () -> Unit = {}) {
         "osm"      -> OsmPlaceGpxGenerator()
         "trip"     -> TripAdvisorGpxGenerator(settings.tripAdvisorApiKey)
         "wikidata" -> WikidataAttractionsGpxGenerator()
-        "inat"     -> INaturalistGpxGenerator(settings.iNaturalistUsername)
+        "inat"     -> INaturalistGpxGenerator(settings.iNaturalistUsername, context)
         "wiki"     -> WikipediaArticlesGpxGenerator()
         "nophoto"  -> NeedPhotoWikidataGpxGenerator(settings.needPhotoExclusions)
         else       -> null
