@@ -229,6 +229,16 @@ fun GpxGeneratorScreen(onNavigateToSettings: () -> Unit = {}) {
                     allPoints.addAll(pts.map { it.copy(color = color) })
                 }
 
+                if (allPoints.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        val stats = results.joinToString(", ") { (id, pts) -> "$id: ${pts.size}" }
+                        val errStr = if (errors.isNotEmpty()) "\nErrors: ${errors.joinToString("; ")}" else ""
+                        statusText = "No points found. GPX was not generated. $stats$errStr"
+                        isGenerating = false
+                    }
+                    return@launch
+                }
+
                 val gpxString = buildGpxContent(allPoints)
                 val fileName = withContext(Dispatchers.IO) { getFileName(coords, sources.joinToString("-")) }
                 val file = File(context.getExternalFilesDir(null), fileName)
