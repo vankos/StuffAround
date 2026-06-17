@@ -163,6 +163,7 @@ class INaturalistGpxGenerator(private val username: String, private val context:
                     "&lng=$lng" +
                     "&radius=$radiusKm" +
                     "&month=$monthParam" +
+                    "&quality_grade=research" +
                     "&per_page=$perPage" +
                     "&page=$page" +
                     "&locale=$locale" +
